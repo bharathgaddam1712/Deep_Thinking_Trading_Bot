@@ -4,7 +4,7 @@
 A Deep Thinking Trading system has many departments, each made up of sub-agents that use logical flows to make smart decisions. For example, an Analyst team gathers data from diverse sources, a Researcher team debates and analyzes this data to form a strategy, and the Execution team refines and approves the trade while working alongside portfolio management, other supporting sub-agents, and more.
 
 There is a lot that happens under the hood, a typical flow works like this …
-![Deep Trading System](images\Image-1.jpg)
+![Deep Trading System](images/Image-1.jpg)
 
 1.  **First, a team of specialized Analyst agents gathers 360-degree market intelligence,** collecting everything from technical data and news to social media sentiment and company fundamentals.
 2.  **Then, a Bull and a Bear agent engage in an adversarial debate** to stress-test the findings, which a Research Manager synthesizes into a single, balanced investment strategy.
@@ -127,7 +127,7 @@ A low temperature encourages the model to stick to the most likely, grounded out
 The `AgentState` is the shared memory the central nervous system of our entire multi-agent system.
 > In LangGraph, the state is a central object that is passed between all nodes. As each agent completes its task, it reads from and writes to this state.
 
-![Agent State Purpose](images\Image-2.jpg)
+![Agent State Purpose](images/Image-2.jpg)
 
 We will define the data structures for this global memory using Python `TypedDict`. This gives us a strongly-typed, predictable structure, which is important for managing complexity. We will start by defining the sub-states for our two debate teams.
 
@@ -188,7 +188,7 @@ The main `AgentState` is now our complete data schema. Notice how it contains fi
 ## Building the Agent Toolkit with Live Data
 An agent is only as good as its tools. So we need a `Toolkit` where we define all the functions our agents can use to interact with the outside world. This is what grounds their reasoning in real, up-to-the-minute data.
 
-![Real-time Data Ingestion](images\Image-3.jpg)
+![Real-time Data Ingestion](images/Image-3.jpg)
 
 
 Each function is decorated with `@tool` from LangChain, along with `Annotated` type hints, providing a schema that the LLM uses to understand the tool's purpose and inputs. Let's start with a tool to fetch raw historical price data.
@@ -313,7 +313,7 @@ Our foundation for agent action is now complete. We have a comprehensive suite o
 ## Implementing Long-Term Memory for Continuous Learning
 For our agents to improve over time, they need long-term memory. To enable true learning, agents must be able to reflect on past decisions and retrieve those lessons when faced with similar situations in the future.
 
-![Long term memory flow](images\image-4.jpg)
+![Long term memory flow](images/image-4.jpg)
 
 The `FinancialSituationMemory` class is the core of this learning loop. It uses a `ChromaDB` vector store to save textual summaries of past situations and the lessons learned from them.
 
@@ -411,7 +411,7 @@ With our foundation in place, it’s time to introduce the first team of agents,
 
 We will therefore create **four specialized analysts**, each responsible for a unique domain.
 
-![Analyst Factory](images\Image-5.jpg)
+![Analyst Factory](images/Image-5.jpg)
 
 Their collective goal is to produce a comprehensive, 360-degree view of the stock and its market environment, populating our `AgentState` with the raw intelligence needed for the next stage of strategic analysis.
 
@@ -685,7 +685,7 @@ With the four analyst reports compiled, our `AgentState` is now packed with raw 
 
 > This is where the **Researcher Team** comes in.
 
-![Resolving Conflicts](images\Image-6.jpg)
+![Resolving Conflicts](images/Image-6.jpg)
 
 This team’s purpose is to critically evaluate the evidence by staging a structured, adversarial debate between two opposing viewpoints a **Bull** and a **Bear**. This process is designed to prevent confirmation bias and stress-test the investment thesis from both sides. A **Research Manager** then oversees this debate and has the crucial task of synthesizing the arguments into a single, coherent investment plan.
 
@@ -848,7 +848,7 @@ With a clear investment plan from the Research Manager, the workflow now moves f
 
 This is the job of the **Trader Agent**. Once the Trader formulates a proposal, it’s passed to the **Risk Management Team** for final scrutiny. Here, agents with different risk appetites aggressive, conservative, and neutral, debate the plan to ensure all angles are considered before capital is committed.
 
-![Trade and RM](images\Image-7.jpg)
+![Trade and RM](images/Image-7.jpg)
 
 
 First, let’s define the logic for our Trader agent. Its primary role is to distill the detailed `investment_plan` into a concise, actionable proposal. A key requirement is that its response must end with a specific, machine-readable tag.
@@ -998,7 +998,7 @@ The output of the risk debate clearly demonstrates the value of the multi-person
 The final step in the decision-making process rests with the **Portfolio Manager** agent.
 > This agent acts as the head of the firm. It reviews the Trader’s plan and the entire risk debate, then issues the final, binding decision.
 
-![Judgment Process](images\Image-8.jpg)
+![Judgment Process](images/Image-8.jpg)
 
 
 This is the most critical step, so we will use our `deep_thinking_llm` to ensure the highest quality of reasoning.
@@ -1049,7 +1049,7 @@ Now that all the individual agent components have been defined and tested, we ar
 ## Orchestrating the Agent Society
 We have now defined and individually tested all the agent components that make up our financial firm: the Analysts, Researchers, Trader, and the Risk Managers. However, they currently exist as isolated functions. The final step in construction is to assemble them into a cohesive, automated workflow using LangGraph’s `StateGraph`.
 
-![Orchestrating Step](images\Image-9.jpg)
+![Orchestrating Step](images/Image-9.jpg)
 
 
 This involves programmatically defining the “nervous system” of our agent society. We will wire the nodes together with edges and, most importantly, define the conditional logic that will route the `AgentState` through the correct sequence of agents, manage the debate loops, and handle the ReAct tool-use cycles.
@@ -1220,7 +1220,7 @@ except Exception as e:
     print(f"Graph visualization failed: {e}. Please ensure pygraphviz is installed.")
 ```
 
-![Workflow Plot](images\Image-10.jpg)
+![Workflow Plot](images/Image-10.jpg)
 
 The output is a visual confirmation of our entire agentic system. We can clearly see the intended flow:
 *   The initial sequential chain of four **Analyst** nodes, each with its own ReAct loop that routes through the central **tools** node.
@@ -1316,7 +1316,7 @@ The final output is consistent with our manual tests, confirming that the fully 
 ## Extracting Clean Signals and Agent Reflection
 Our pipeline has successfully produced a decision. However, for practical use, we need two final pieces:
 
-![Signal and Reflection](images\Image-11.jpg)
+![Signal and Reflection](images/Image-11.jpg)
 
 1.  **A clean, machine-readable final signal** (BUY, SELL, or HOLD). The Portfolio Manager’s output is natural language; we need to distill it into a single, unambiguous command.
 2.  **A mechanism for the agents to learn from the outcome**. This is what turns a one-off analysis into a system that can improve over time.
@@ -1401,7 +1401,7 @@ They have each generated a lesson (e.g., "In a market with strong technical and 
 While our pipeline produces a decision, how can we be sure it’s a *good* one?
 > A production system requires automated ways to score the quality of its output.
 
-![Evaluation Strategies](images\Image-12.jpg)
+![Evaluation Strategies](images/Image-12.jpg)
 
 We will now implement and run several evaluation techniques to assess our system from different angles: qualitative reasoning, objective market outcomes, and factual accuracy.
 
