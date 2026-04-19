@@ -1,0 +1,55 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Environment Variables
+.env
+
+# Logs & Temporary Files
+*.log
+*.err
+*output*.txt
+compile_clean.txt
+errors.txt
+errors*.json
+
+# Protobuf artifacts (Add back if you need these checked in)
+protoc/
+
+# IDE / OS specific
+.vscode/
+.idea/
+__pycache__/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

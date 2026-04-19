@@ -1,0 +1,8 @@
+Component,Library/Tool,Reason
+Async Runtime,tokio,The industry standard for high-concurrency non-blocking I/O.
+HTTP/REST,reqwest,For POST /v3/place_order and account management.
+WebSockets,tokio-tungstenite,"Low-level, high-speed stream handling for Roostoo's ticker feed."
+Serialization,serde / serde_json,Zero-copy deserialization of exchange JSON payloads.
+Cryptography,hmac + sha2,To generate the MSG-SIGNATURE required by Roostoo.
+Rate Limiting,governor,A state-of-the-art implementation of the Token Bucket algorithm.
+Logging,tracing,"Structured, asynchronous logging for high-frequency audit trails."

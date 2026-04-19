@@ -1,0 +1,28 @@
+syntax = "proto3";
+package trading;
+
+message MarketTick {
+    string pair = 1;
+    double price = 2;
+    double volume = 3;
+    uint64 timestamp = 4;
+}
+
+message KLine {
+    string pair = 1;
+    double open = 2;
+    double high = 3;
+    double low = 4;
+    double close = 5;
+    double volume = 6;
+    uint64 timestamp = 7;
+}
+
+message TradeSignal {
+    string pair = 1;
+    string side = 2; // BUY or SELL
+    string type = 3; // MARKET or LIMIT
+    double quantity = 4;
+    uint64 source_timestamp = 5;
+}
+
