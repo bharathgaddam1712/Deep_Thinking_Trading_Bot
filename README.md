@@ -45,8 +45,10 @@ graph TD
     
     %% API / Execution Layer
     subgraph External_APIs ["External APIs & Markets"]
-        F --> CCXT_API(CCXT Exchange Abstraction)
-        CCXT_API <--> Market(Binance / Crypto Markets)
+        F --> CCXT_API(Crypto: CCXT Abstraction)
+        F --> TradFi_API(Stocks: Broker API - Alpaca/IBKR)
+        CCXT_API <--> Market(Crypto Markets)
+        TradFi_API <--> TradFiMarket(Traditional Markets - Stocks/ETFs)
     end
 
     %% Monitoring
