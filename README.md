@@ -10,8 +10,16 @@ There is a lot that happens under the hood, a typical flow works like this …
 2.  **Then, a Bull and a Bear agent engage in an adversarial debate** to stress-test the findings, which a Research Manager synthesizes into a single, balanced investment strategy.
 3.  **Next, a Trader agent translates this strategy into a concrete, actionable proposal,** which is immediately scrutinized by a multi-perspective Risk Management team (Risky, Safe, and Neutral).
 4.  **The final, binding decision is made by a Portfolio Manager agent,** who weighs the Trader’s plan against the risk debate to give the final approval.
-5.  **After approval, the system extracts a clean, machine-readable signal** (BUY, SELL, or HOLD) from the manager’s natural language decision for execution and auditing.
-6.  **Finally, the entire process creates a feedback loop.** Agents reflect on the trade’s outcome to generate new lessons, which are stored in their long-term memory to continuously improve future performance.
+5.  **After approval, the system extracts a clean, machine-readable signal** (BUY, SELL, or HOLD) from the manager’s natural language decision for execution via the **FastAPI Layer.**
+6.  **The Intelligence Bridge pushes the signal to a High-Frequency Rust Execution Engine** (`Trading-Bot/`) over ZeroMQ, where a final millisecond-latency risk-gate checks it before touching the actual exchange.
+7.  **Finally, the entire process creates a feedback loop.** Agents reflect on the trade’s outcome to generate new lessons, which are stored in their local sentence-transformers memory to continuously improve future performance.
+
+## Final Architecture Overview
+1. **The Brain (Python/LangGraph)**: The multi-agent debate and research cluster running on `gemini-2.0-flash` with a global rate-limit throttle.
+2. **The Intelligence Bridge (ZMQ)**: Python passes AI-authorized signals down to Rust via local TCP Sockets on port `5557`.
+3. **The Execution Engine (Rust)**: Listens for market ticks and signals simultaneously. Acts as the zero-latency Risk Gate before submitting orders.
+4. **The Exchange Adaptor (CCXT)**: General-purpose exchange abstraction layer for multi-crypto compatibility.
+5. **The API Dashboard (FastAPI)**: Real-time UI connecting endpoints to monitor the agent state.
 
 > In this blog, we will code and visualize an advanced agent-based trading system where Analysts, Researchers, Traders, Risk Managers, and a Portfolio Manager work together to execute smart trades.
 
@@ -40,7 +48,7 @@ First, we should keep our API keys safe and set up tracing with LangSmith. Traci
 
 ```python
 # First, ensure you have the necessary libraries installed
-# !pip install -U langchain langgraph langchain_openai tavily-python yfinance finnhub-python stockstats beautifulsoup4 chromadb rich
+# pip install -U langchain langgraph langchain-google-genai tavily-python yfinance finnhub-python stockstats beautifulsoup4 chromadb rich sentence-transformers
 
 import os
 from getpass import getpass
@@ -52,7 +60,7 @@ def _set_env(var: str):
         os.environ[var] = getpass(f"Enter your {var}: ")
 
 # Set API keys for the services we'll use.
-_set_env("OPENAI_API_KEY")
+_set_env("GEMINI_API_KEY") # Get free tier key from aistudio.google.com
 _set_env("FINNHUB_API_KEY")
 _set_env("TAVILY_API_KEY")
 _set_env("LANGSMITH_API_KEY")
@@ -76,10 +84,9 @@ from pprint import pprint
 config = {
     "results_dir": "./results",
     # LLM settings specify which models to use for different cognitive tasks.
-    "llm_provider": "openai",
-    "deep_think_llm": "gpt-4o",       # A powerful model for complex reasoning and final decisions.
-    "quick_think_llm": "gpt-4o-mini", # A fast, cheaper model for data processing and initial analysis.
-    "backend_url": "https://api.openai.com/v1",
+    "llm_provider": "gemini",
+    "deep_think_llm": "gemini-2.0-flash",       # High TPS reasoning model (Gemini Free Tier)
+    "quick_think_llm": "gemini-2.0-flash",      # High TPS for data processing and initial analysis.
     # Debate and discussion settings control the flow of collaborative agents.
     "max_debate_rounds": 2,          # The Bull vs. Bear debate will have 2 rounds.
     "max_risk_discuss_rounds": 1,    # The Risk team has 1 round of debate.
@@ -103,19 +110,19 @@ These parameters will make sense to you more later in the blog but let’s break
 
 With our configuration defined, we can now initialize the LLMs that will serve as the cognitive engines for our agents.
 ```python
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 # Initialize the powerful LLM for high-stakes reasoning tasks.
-deep_thinking_llm = ChatOpenAI(
+deep_thinking_llm = ChatGoogleGenerativeAI(
     model=config["deep_think_llm"],
-    base_url=config["backend_url"],
-    temperature=0.1
+    temperature=0.1,
+    google_api_key=os.environ.get("GEMINI_API_KEY")
 )
 # Initialize the faster, cost-effective LLM for routine data processing.
-quick_thinking_llm = ChatOpenAI(
+quick_thinking_llm = ChatGoogleGenerativeAI(
     model=config["quick_think_llm"],
-    base_url=config["backend_url"],
-    temperature=0.1
+    temperature=0.1,
+    google_api_key=os.environ.get("GEMINI_API_KEY")
 )
 ```
 We have now instantiated our two LLMs. Note the `temperature` parameter is set to `0.1`.
