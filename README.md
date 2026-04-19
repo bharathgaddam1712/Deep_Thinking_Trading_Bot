@@ -6,6 +6,8 @@ A Deep Thinking Trading system has many departments, each made up of sub-agents 
 There is a lot that happens under the hood, a typical flow works like this …
 ![Deep Trading System](images/Image-1.jpg)
 
+**🌍 Multi-Market Support**: This AI system is extremely versatile. It is not limited to Crypto trading (via CCXT). By routing the execution layer to a broker API (like Alpaca or Interactive Brokers) and pulling data via `yfinance`, the bot autonomously researches, debates, and executes the best **Stocks, Indices, or ETFs** in traditional financial markets!
+
 1.  **First, a team of specialized Analyst agents gathers 360-degree market intelligence,** collecting everything from technical data and news to social media sentiment and company fundamentals.
 2.  **Then, a Bull and a Bear agent engage in an adversarial debate** to stress-test the findings, which a Research Manager synthesizes into a single, balanced investment strategy.
 3.  **Next, a Trader agent translates this strategy into a concrete, actionable proposal,** which is immediately scrutinized by a multi-perspective Risk Management team (Risky, Safe, and Neutral).
@@ -21,10 +23,37 @@ There is a lot that happens under the hood, a typical flow works like this …
 4. **The Exchange Adaptor (CCXT)**: General-purpose exchange abstraction layer for multi-crypto compatibility.
 5. **The API Dashboard (FastAPI)**: Real-time UI connecting endpoints to monitor the agent state.
 
-> In this blog, we will code and visualize an advanced agent-based trading system where Analysts, Researchers, Traders, Risk Managers, and a Portfolio Manager work together to execute smart trades.
+```mermaid
+graph TD
+    %% Python Agentic Brain
+    subgraph Python_Brain ["Python Research Brain (LangGraph + Gemini 2.0)"]
+        A[Data Analysts <br/> Market, Sentiment, News] --> B[Bull vs Bear Debate]
+        B --> C[Risk Management]
+        C --> D[Portfolio Manager Strategy]
+    end
 
+    %% IPC Bridge
+    subgraph Intelligence_Bridge ["ZeroMQ Intelligence Bridge"]
+        D -->|AI Signal Trigger: 'BUY/SELL'| ZMQ_Push(ZMQ Push Socket <br/> Port 5557)
+    end
 
-<!-- omit in toc -->
+    %% Rust Execution Layer
+    subgraph Rust_Execution_Engine ["Rust High-Frequency Engine"]
+        ZMQ_Push -->|Parse Signal| E[Risk Gate Filter]
+        E -->|Millisecond Check| F[Order Fulfillment Engine]
+    end
+    
+    %% API / Execution Layer
+    subgraph External_APIs ["External APIs & Markets"]
+        F --> CCXT_API(CCXT Exchange Abstraction)
+        CCXT_API <--> Market(Binance / Crypto Markets)
+    end
+
+    %% Monitoring
+    subgraph Dashboard ["FastAPI Monitoring"]
+        D -.-> Web(API Endpoint State Updates)
+    end
+```<!-- omit in toc -->
 ## Table of Contents
 - [Setting up the Environment, LLMs, and LangSmith Tracing](#setting-up-the-environment-llms-and-langsmith-tracing)
 - [Designing the Shared Memory](#designing-the-shared-memory)
@@ -101,7 +130,6 @@ print("Configuration dictionary created:")
 pprint(config)
 ```
 
-These parameters will make sense to you more later in the blog but let’s break down a few key parameters here. The choice of two different models (`deep_think_llm` and `quick_think_llm`) is a deliberate architectural decision to optimize for both cost and performance. **deep_think_llm (`gpt-4o`)** → handles complex reasoning and final decisions.
 
 *   `quick_think_llm` (`gpt-4o-mini`) for faster, cheaper for routine tasks.
 *   max_debate_rounds is for controls how many rounds the Bull vs. Bear agents argue.
