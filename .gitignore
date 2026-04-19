@@ -1,2 +1,6 @@
 ﻿trading_env/
+env/
 __pycache__/
+.env
+data_cache/
+results/
