@@ -15,9 +15,20 @@ POPULAR_SYMBOLS = [
 
 ROOSTOO_SYMBOLS = POPULAR_SYMBOLS
 
-def get_yfinance_ticker(roostoo_symbol):
-    """Converts Roostoo symbol (COIN/USD) to yfinance format (COIN-USD)"""
-    return roostoo_symbol.replace("/", "-")
+# Stock Symbols (Alpaca)
+STOCK_SYMBOLS = [
+    "AAPL", "MSFT", "NVDA", "TSLA", "GOOGL", "AMZN", "META", "BRK.B", "V", "JNJ"
+]
+
+def get_yfinance_ticker(symbol):
+    """Converts Roostoo symbol (COIN/USD) to yfinance format (COIN-USD) or keeps ticker."""
+    if "/" in symbol:
+        return symbol.replace("/", "-")
+    return symbol
+
+def is_crypto(symbol):
+    """Checks if a symbol is a crypto pair (contains /) or a stock."""
+    return "/" in symbol
 
 def get_ccxt_symbol(roostoo_symbol):
     """Converts Roostoo symbol (COIN/USD) to CCXT standard (COIN/USDT)"""

@@ -1,0 +1,19 @@
+{
+    "cash": 900,
+    "holdings": {
+        "AAPL": {
+            "qty": 0.3700551382155941,
+            "avg_price": 270.23
+        }
+    },
+    "history": [
+        {
+            "timestamp": "2026-04-19T23:44:17.524062",
+            "side": "BUY",
+            "symbol": "AAPL",
+            "qty": 0.3700551382155941,
+            "price": 270.23,
+            "amount_usd": 100
+        }
+    ]
+}

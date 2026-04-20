@@ -6,8 +6,9 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 # Import our custom modules
-from config_manager import ROOSTOO_SYMBOLS, get_yfinance_ticker
+from config_manager import ROOSTOO_SYMBOLS, STOCK_SYMBOLS, get_yfinance_ticker
 from momentum_scanner import get_top_10_tickers
+from execution_manager import ExecutionManager
 from trading_bot_opensource import (
     AgentState, InvestDebateState, RiskDebateState,
     market_analyst_node, social_analyst_node, news_analyst_node, fundamentals_analyst_node,
@@ -40,12 +41,18 @@ class RateLimiter:
 
 class AutonomousTradingSystem:
     def __init__(self):
-        self.symbols = ROOSTOO_SYMBOLS
+        self.crypto_symbols = ROOSTOO_SYMBOLS
+        self.stock_symbols = STOCK_SYMBOLS
+        self.all_symbols = self.crypto_symbols + self.stock_symbols
+        
         self.bias_file = "trading_bias.json"
         self.rate_limiter = RateLimiter(llm_delay=0) # Handled globally in trading_bot_opensource.py
         self.last_full_scan = datetime.min
         self.results_dir = "./results"
         self.status_file = "status.json"
+        
+        self.executor = ExecutionManager()
+        
         os.makedirs(self.results_dir, exist_ok=True)
         self.update_status("Online", "System initialized.")
 
@@ -75,7 +82,7 @@ class AutonomousTradingSystem:
                 data[res['ticker']] = {
                     "signal": res['signal'],
                     "timestamp": datetime.now().isoformat(),
-                    "trader_plan": res['trader_plan'][:500] 
+                    "trader_plan": res['trader_plan'] 
                 }
 
             with open(self.bias_file, "w") as f:
@@ -100,8 +107,8 @@ class AutonomousTradingSystem:
             yf_ticker = get_yfinance_ticker(ticker)
             
             st = AgentState(
-                messages=[HumanMessage(content=f"Analyse {yf_ticker} for trading on {trade_date}")],
-                company_of_interest=yf_ticker,
+                messages=[HumanMessage(content=f"Analyse {ticker} for trading on {trade_date}")],
+                company_of_interest=ticker,
                 trade_date=trade_date,
                 portfolio_capital=default_config.get("PORTFOLIO_CAPITAL", 100000),
                 investment_debate_state=InvestDebateState(history="", current_response="", count=0, bull_history="", bear_history="", judge_decision=""),
@@ -202,42 +209,49 @@ class AutonomousTradingSystem:
 
     def start(self):
         console.print("[bold green]Autonomous Trading System Online.[/bold green]")
-        self.update_status("Online", "Waiting for next cycle.")
+        self.update_status("Online", "Initial Gap Analysis...")
         
         while True:
             now = datetime.now()
             
-            # 48-Hour Full Scan (Optimized Tiered Screening)
-            if (now - self.last_full_scan) >= timedelta(hours=48):
-                console.print("\n[bold magenta]+++ INITIATING 48-HOUR TIERED MARKET SCREENING +++[/bold magenta]")
-                
-                # STAGE 1: Light Scan all 46 symbols (Technical only)
-                light_results = self.run_cycle(self.symbols, "LIGHT SCREENING", deep_analysis=False)
-                
-                # STAGE 2: Select candidates that generated an actionable signal (BUY/SELL)
-                candidates = [res['ticker'] for res in light_results if res['signal'] in ['BUY', 'SELL']]
-                
-                if candidates:
-                    console.print(f"\n[bold yellow]Promising candidates found: {', '.join(candidates)}. Starting deep analysis...[/bold yellow]")
-                    self.run_cycle(candidates, "DEEP ANALYSIS", deep_analysis=True)
-                else:
-                    console.print("\n[bold blue]No strong technical candidates found. Skipping deep cycle.[/bold blue]")
-                
-                self.last_full_scan = now
-                console.print("[bold green]Full Market Screening Complete.[/bold green]")
+            # Load current biases to find gaps
+            current_biases = {}
+            if os.path.exists(self.bias_file):
+                try:
+                    with open(self.bias_file, "r") as f:
+                        current_biases = json.load(f)
+                except Exception:
+                    pass
+
+            # Identify missing symbols
+            missing = [s for s in self.all_symbols if s not in current_biases]
             
-            # Hourly Top 10 Analysis (Always Deep)
-            console.print(f"\n[bold cyan]Time: {now.strftime('%H:%M:%S')} | Initiating Hourly Deep Research[/bold cyan]")
-            try:
-                top_10 = get_top_10_tickers()
-                console.print(f"Top 10 Momentum Leaders: {', '.join(top_10)}")
-                self.run_cycle(top_10, "HOURLY DEEP CYCLE", deep_analysis=True)
-            except Exception as e:
-                console.print(f"[bold red]Critical Error in Scheduler: {e}[/bold red]")
+            # Identify symbols to refresh (Oldest first)
+            stale = sorted(
+                [s for s in self.all_symbols if s in current_biases],
+                key=lambda s: current_biases[s].get("timestamp", "1970-01-01")
+            )
             
-            # Wait for next hour
-            console.print("\n[italic yellow]Cycle complete. Sleeping for 60 minutes...[/italic yellow]")
-            time.sleep(3600)
+            # Form the queue: Missing first, then Stale
+            queue = missing + stale
+            
+            if missing:
+                console.print(f"\n[bold yellow]FOUND GAPS: {len(missing)} missing assets identified.[/bold yellow]")
+                # Process all missing immediately in batches of 5 to show progress
+                for i in range(0, len(missing), 5):
+                    batch = missing[i:min(i+5, len(missing))]
+                    self.run_cycle(batch, "GAP FILLING", deep_analysis=True)
+            else:
+                # Regular Refresh Cycle
+                console.print(f"\n[bold cyan]Time: {now.strftime('%H:%M:%S')} | Refreshing oldest data...[/bold cyan]")
+                # Refresh top 5 oldest/stale ones
+                top_refresh = stale[:5]
+                self.run_cycle(top_refresh, "STALE REFRESH", deep_analysis=True)
+            
+            # Wait for next priority check
+            console.print("\n[italic yellow]Cycle complete. Next gap/stale check in 10 minutes...[/italic yellow]")
+            time.sleep(600)
+
 
 if __name__ == "__main__":
     system = AutonomousTradingSystem()

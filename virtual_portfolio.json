@@ -1,0 +1,139 @@
+{
+    "cash": 99975.83854999999,
+    "holdings": {
+        "SEI/USD": {
+            "qty": 1.0,
+            "avg_price": 0.05435
+        },
+        "AVAX/USD": {
+            "qty": 2.0,
+            "avg_price": 8.995000000000001
+        },
+        "APT/USD": {
+            "qty": 1.0,
+            "avg_price": 0.916
+        },
+        "ADA/USD": {
+            "qty": 11.0,
+            "avg_price": 0.2426
+        },
+        "NEAR/USD": {
+            "qty": 2.5,
+            "avg_price": 1.349
+        }
+    },
+    "history": [
+        {
+            "timestamp": "2026-04-20T03:44:37.453592",
+            "side": "BUY",
+            "symbol": "AAVE/USD",
+            "qty": 1.0,
+            "price": 89.72,
+            "amount_usd": 89.72
+        },
+        {
+            "timestamp": "2026-04-20T03:47:50.931874",
+            "side": "BUY",
+            "symbol": "SEI/USD",
+            "qty": 1.0,
+            "price": 0.05435,
+            "amount_usd": 0.05435
+        },
+        {
+            "timestamp": "2026-04-20T03:53:50.653786",
+            "side": "BUY",
+            "symbol": "AAVE/USD",
+            "qty": 1.0,
+            "price": 88.92,
+            "amount_usd": 88.92
+        },
+        {
+            "timestamp": "2026-04-20T03:57:21.066015",
+            "side": "BUY",
+            "symbol": "AAVE/USD",
+            "qty": 0.09999999999999999,
+            "price": 89.14,
+            "amount_usd": 8.914
+        },
+        {
+            "timestamp": "2026-04-20T04:00:07.303098",
+            "side": "BUY",
+            "symbol": "AVAX/USD",
+            "qty": 1.0,
+            "price": 8.99,
+            "amount_usd": 8.99
+        },
+        {
+            "timestamp": "2026-04-20T04:01:04.909305",
+            "side": "BUY",
+            "symbol": "AVAX/USD",
+            "qty": 1.0,
+            "price": 9.0,
+            "amount_usd": 9.0
+        },
+        {
+            "timestamp": "2026-04-20T04:05:10.475644",
+            "side": "BUY",
+            "symbol": "APT/USD",
+            "qty": 1.0,
+            "price": 0.916,
+            "amount_usd": 0.916
+        },
+        {
+            "timestamp": "2026-04-20T04:18:08.700871",
+            "side": "BUY",
+            "symbol": "AAVE/USD",
+            "qty": 1.0,
+            "price": 90.07,
+            "amount_usd": 90.07
+        },
+        {
+            "timestamp": "2026-04-20T04:19:27.189859",
+            "side": "BUY",
+            "symbol": "AAVE/USD",
+            "qty": 1.0,
+            "price": 90.23,
+            "amount_usd": 90.23
+        },
+        {
+            "timestamp": "2026-04-20T04:23:19.612409",
+            "side": "BUY",
+            "symbol": "ADA/USD",
+            "qty": 1.0,
+            "price": 0.2426,
+            "amount_usd": 0.2426
+        },
+        {
+            "timestamp": "2026-04-20T04:24:30.221750",
+            "side": "BUY",
+            "symbol": "ADA/USD",
+            "qty": 10.0,
+            "price": 0.2426,
+            "amount_usd": 2.426
+        },
+        {
+            "timestamp": "2026-04-20T04:30:46.296427",
+            "side": "BUY",
+            "symbol": "AAVE/USD",
+            "qty": 1.0,
+            "price": 90.0,
+            "amount_usd": 90.0
+        },
+        {
+            "timestamp": "2026-04-20T04:31:48.321891",
+            "side": "SELL",
+            "symbol": "AAVE/USD",
+            "qty": 5.1,
+            "price": 89.94,
+            "amount_usd": 458.69399999999996
+        },
+        {
+            "timestamp": "2026-04-20T10:18:56.934849",
+            "side": "BUY",
+            "symbol": "NEAR/USD",
+            "qty": 2.5,
+            "price": 1.349,
+            "amount_usd": 3.3725
+        }
+    ]
+}

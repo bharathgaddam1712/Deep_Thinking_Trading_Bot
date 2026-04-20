@@ -57,10 +57,10 @@ from pprint import pprint
 
 config = {
     "results_dir": "./results",
-    "llm_provider": "gemini",
-    "deep_think_llm":  "gemini-2.0-flash", # High intelligence for final decisions
-    "quick_think_llm": "gemini-2.0-flash",     # High TPS for debate rounds
-    "analyst_llm":     "gemini-2.0-flash",     # High TPS for tool execution
+    "llm_provider": "groq",
+    "deep_think_llm":  "llama-3.3-70b-versatile", # High intelligence for final decisions
+    "quick_think_llm": "llama-3.1-8b-instant",     # High TPS for debate rounds
+    "analyst_llm":     "llama-3.1-8b-instant",     # High TPS for tool execution
     "max_debate_rounds": 2,
     "max_risk_discuss_rounds": 1,
     "max_recur_limit": 100,
@@ -73,23 +73,23 @@ config = {
 os.makedirs(config["data_cache_dir"], exist_ok=True)
 os.makedirs(config["results_dir"], exist_ok=True)
 
-# -- LLMs: Gemini (free tier) ------------------------------
-from langchain_google_genai import ChatGoogleGenerativeAI
+# -- LLMs: Groq (free tier) ------------------------------
+from langchain_groq import ChatGroq
 
-deep_thinking_llm = ChatGoogleGenerativeAI(
+deep_thinking_llm = ChatGroq(
     model=config["deep_think_llm"],
     temperature=0.1,
-    google_api_key=os.environ.get("GEMINI_API_KEY")
+    groq_api_key=os.environ.get("GROQ_API_KEY")
 )
-quick_thinking_llm = ChatGoogleGenerativeAI(
+quick_thinking_llm = ChatGroq(
     model=config["quick_think_llm"],
     temperature=0.1,
-    google_api_key=os.environ.get("GEMINI_API_KEY")
+    groq_api_key=os.environ.get("GROQ_API_KEY")
 )
-analyst_llm = ChatGoogleGenerativeAI(
+analyst_llm = ChatGroq(
     model=config["analyst_llm"],
     temperature=0.1,
-    google_api_key=os.environ.get("GEMINI_API_KEY")
+    groq_api_key=os.environ.get("GROQ_API_KEY")
 )
 
 # Global tracker for  limiting across all agents
@@ -119,7 +119,7 @@ def safe_llm_invoke(llm, prompt_or_msgs, max_retries=10):
                 # Dynamic wait exponential backoff
                 wait_time = (2 ** i) + random.random() * 5
                 
-                print(f"WARN: API Rate Limit Hit. Waiting {wait_time:.2f}s (Attempt {i+1}/{max_retries})...")
+                print(f"WARN: API Rate Limit Hit. Waiting {wait_time:.2f}s (Attempt {i+1}/{max_retries})...", flush=True)
                 time.sleep(wait_time)
                 continue
             
@@ -188,46 +188,39 @@ from ccxt_provider import CryptoDataProvider
 _provider = CryptoDataProvider()
 
 # -- Tool 1: Crypto OHLCV data (CCXT) -------------------------------------------
+# -- Tool 1: Market Data OHLCV ---------------------------------------------------
 @tool
 def get_yfinance_data(
-    symbol: Annotated[str, "NSE ticker with .NS suffix, e.g. RELIANCE.NS"],
+    symbol: Annotated[str, "Ticker symbol (e.g. AAPL or BTC/USD)"],
     start_date: Annotated[str, "Start date yyyy-mm-dd"],
     end_date:   Annotated[str, "End date   yyyy-mm-dd"],
 ) -> str:
-    """Retrieve crypto price OHLCV data from Binance/MEXC (CCXT)."""
+    """Retrieve market price OHLCV data."""
     try:
-        # Convert yfinance-style symbol back if needed, or assume symbol is COIN/USD
-        clean_symbol = symbol.replace("-", "/")
-        df = _provider.fetch_ohlcv_to_df(clean_symbol)
-        
+        df = _provider.fetch_ohlcv_to_df(symbol)
         if df.empty:
-            return f"No data found for '{symbol}' via CCXT."
+            return f"No data found for '{symbol}'."
         return df.tail(15).to_csv()
     except Exception as e:
-        return f"Error fetching CCXT data: {e}"
+        return f"Error fetching market data: {e}"
 
 # -- Tool 2: Technical indicators via stockstats (free, local) -----------------
 @tool
 def get_technical_indicators(
-    symbol: Annotated[str, "NSE ticker with .NS suffix, e.g. RELIANCE.NS"],
+    symbol: Annotated[str, "Ticker symbol (e.g. AAPL or BTC/USD)"],
     start_date: Annotated[str, "Start date yyyy-mm-dd"],
     end_date:   Annotated[str, "End date   yyyy-mm-dd"],
 ) -> str:
-    """Compute MACD, RSI-14, Bollinger Bands, 50/200 SMA locally via CCXT data."""
+    """Compute MACD, RSI-14, Bollinger Bands, 50/200 SMA locally."""
     try:
-        clean_symbol = symbol.replace("-", "/")
-        df = _provider.fetch_ohlcv_to_df(clean_symbol, limit=200) # Get enough for averages
-        
+        df = _provider.fetch_ohlcv_to_df(symbol, limit=200) # Get enough for averages
         if df.empty:
             return "No data to calculate indicators."
-            
-        # stockstats expects lowercase 'close', 'high', etc.
-        # CCXT provider already lowercase columns (open, high, low, close, volume)
         stock_df = stockstats_wrap(df)
         indicators = stock_df[['macd', 'rsi_14', 'boll', 'boll_ub', 'boll_lb', 'close_50_sma', 'close_200_sma']]
         return indicators.tail(5).to_csv()
     except Exception as e:
-        return f"Error calculating technical indicators via CCXT: {e}"
+        return f"Error calculating technical indicators: {e}"
 
 # -- Tool 3: Company news via yfinance + Yahoo RSS (FREE, replaces Finnhub) ----
 # Finnhub does not cover Indian (NSE) stocks well. yfinance news is free and
@@ -303,24 +296,30 @@ tavily_tool = TavilySearchResults(max_results=3)
 # -- Tool 4: Social media sentiment via Tavily search (free tier) --------------
 @tool
 def get_social_media_sentiment(ticker: str, trade_date: str) -> str:
-    """Live web search for social media sentiment about a cryptocurrency."""
-    coin = ticker.split("/")[0]
-    query = f"{coin} crypto sentiment reddit twitter X.com CryptoCurrency discussion {trade_date}"
+    """Live web search for social media sentiment (X, Reddit, WallStreetBets)."""
+    from config_manager import is_crypto
+    if is_crypto(ticker):
+        query = f"{ticker} crypto sentiment reddit twitter X.com CryptoCurrency discussion {trade_date}"
+    else:
+        query = f"{ticker} stock sentiment wallstreetbets reddit twitter X.com discussion {trade_date}"
     return tavily_tool.invoke({"query": query})
 
 # -- Tool 5: Fundamental analysis via Tavily search (free tier) ----------------
 @tool
 def get_fundamental_analysis(ticker: str, trade_date: str) -> str:
-    """Live web search for crypto project tokenomics, TVL, and developer roadmap."""
-    coin = ticker.split("/")[0]
-    query = f"{coin} crypto project tokenomics TVL total value locked developer activity github {trade_date}"
+    """Live web search for financials (Stocks) or tokenomics (Crypto)."""
+    from config_manager import is_crypto
+    if is_crypto(ticker):
+        query = f"{ticker} crypto project tokenomics TVL total value locked developer activity github {trade_date}"
+    else:
+        query = f"{ticker} stock company financial health revenue earnings P/E ratio balance sheet {trade_date}"
     return tavily_tool.invoke({"query": query})
 
 # -- Tool 6: Macroeconomic news via Tavily search (free tier) ------------------
 @tool
 def get_macroeconomic_news(trade_date: str) -> str:
-    """Live web search for Global Macro and Crypto news (FED, Inflation, ETF flows)."""
-    query = f"Global crypto market macro news FED inflation Bitcoin ETF spot flows SEC decision {trade_date}"
+    """Live web search for Global Macro, FED news, and market trends."""
+    query = f"Global market macro news FED inflation interest rates market trends {trade_date}"
     return tavily_tool.invoke({"query": query})
 
 # -- Toolkit -------------------------------------------------------------------
@@ -422,9 +421,10 @@ def create_analyst_node(llm, toolkit, system_message, tools, output_field):
 # Market Analyst — price + technical indicators
 market_analyst_node = create_analyst_node(
     analyst_llm, toolkit,
-    "You are a crypto trading assistant. "
-    "Analyze the asset's price action, momentum, and volatility using technical indicators from Binance/MEXC. "
-    "STRICTLY report all prices and targets in USD. FORBIDDEN: INR, NSE, India. "
+    "You are a professional market analyst. "
+    "Analyze the asset's price action, momentum, and volatility. "
+    "If it is a stock, look for traditional technical patterns. If crypto, look for liquidity and volatility. "
+    "STRICTLY report all prices and targets in USD. "
     "Use your tools to fetch historical data, then write a report with a summary table.",
     [toolkit.get_yfinance_data, toolkit.get_technical_indicators],
     "market_report",
@@ -455,10 +455,10 @@ news_analyst_node = create_analyst_node(
 # Fundamentals Analyst - financial health
 fundamentals_analyst_node = create_analyst_node(
     analyst_llm, toolkit,
-    "You are a crypto fundamental analyst. "
-    "Research the project's tokenomics, total value locked (TVL), network security, and project roadmap. "
-    "Analyze its 'Utility' and 'Scarcity' vs competitors. "
-    "STRICTLY use USD. No mentions of Indian equities. "
+    "You are a fundamental research analyst. "
+    "For STOCKS: Research revenue, earnings, P/E ratio, and company roadmap. "
+    "For CRYPTO: Research tokenomics, total value locked (TVL), and network security. "
+    "STRICTLY report in USD. "
     "Write a detailed fundamental report with a summary table.",
     [toolkit.get_fundamental_analysis],
     "fundamentals_report",

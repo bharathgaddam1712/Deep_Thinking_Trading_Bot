@@ -40,4 +40,6 @@ sentence-transformers
 beautifulsoup4
 
 # ipython and pygraphviz are optional for visualization
-ipython
+# ── Execution & Broker Drivers ──────────────────────────
+ccxt              # Crypto execution
+alpaca-trade-api  # Stock execution (Legacy)
