@@ -60,11 +60,17 @@ async def get_balance():
         r_bal = r_client.get_balance()
         
         if r_bal.get("Success"):
-            usd_bal = r_bal["SpotWallet"].get("USD", {}).get("Free", 0)
+            spot = r_bal.get("SpotWallet", {})
+            usd_bal = spot.get("USD", {}).get("Free", 0)
+            
+            # Extract all coins for the tooltip/detail
+            assets = {k: v.get("Free", 0) for k, v in spot.items() if v.get("Free", 0) > 0}
+            
             return {
                 "net_worth": usd_bal, 
                 "bridge": "Active - Roostoo Platform",
-                "is_live": True
+                "is_live": True,
+                "assets": assets
             }
         
         # Fallback to local
@@ -73,50 +79,106 @@ async def get_balance():
         return {
             "net_worth": summary["net_worth"],
             "bridge": "Local Virtual Simulation",
-            "is_live": False
+            "is_live": False,
+            "assets": {"USD": summary["cash"]}
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/holdings")
+async def get_holdings():
+    try:
+        from roostoo_client import RoostooClient
+        r_client = RoostooClient()
+        r_bal = r_client.get_balance()
+        
+        if not r_bal.get("Success"):
+            return []
+
+        spot_wallet = r_bal.get("SpotWallet", {})
+        broker = LocalBroker()
+        local_holdings = broker.data.get("holdings", {})
+        
+        holdings = []
+        for coin, info in spot_wallet.items():
+            qty = info.get("Free", 0)
+            
+            # Filter: Exclude USD and empty keys, only Free > 0
+            if coin in ["USD", "", "VIRTUAL"] or qty <= 0:
+                continue
+                
+            symbol = f"{coin}/USD"
+            current_price = broker.get_price(symbol)
+            
+            # Get Entry Price from local history if exists, otherwise fallback to current
+            entry_price = current_holdings.get(symbol, {}).get("avg_price") if (current_holdings := local_holdings) else None
+            if not entry_price:
+                 entry_price = current_price or 0.0
+
+            if current_price and entry_price > 0:
+                pnl = (current_price - entry_price) * qty
+                pnl_pct = ((current_price - entry_price) / entry_price) * 100
+            else:
+                pnl, pnl_pct = 0.0, 0.0
+
+            holdings.append({
+                "symbol": symbol,
+                "qty": round(qty, 4),
+                "entry": round(entry_price, 4),
+                "current": round(current_price, 4) if current_price else 0.0,
+                "pnl": round(pnl, 2),
+                "pnl_pct": round(pnl_pct, 2)
+            })
+            
+        return holdings
+    except Exception as e:
+        print(f"Error in get_holdings: {e}")
+        return []
+
 @app.post("/api/execute")
 async def execute_trade(data: Request):
-    req = await data.json()
-    pair = req.get("pair")
-    side = req.get("side") # BUY or SELL
-    quantity = float(req.get("quantity", 1.0))
-    
-    # Try Protobuf/ZMQ if available
-    if trading_pb2:
-        try:
-            signal = trading_pb2.TradeSignal()
-            signal.pair = pair
-            signal.side = side
-            signal.type = "MARKET"
-            signal.quantity = quantity
-            signal.source_timestamp = datetime.now().strftime("%H:%M:%S")
-            push_socket.send(signal.SerializeToString())
-            return {"status": "success", "message": f"Sent ZMQ {side} order for {quantity} {pair}"}
-        except Exception:
-            pass
-
-    # Fallback to direct LocalBroker execution
     try:
-        broker = LocalBroker()
-        # Estimate USD amount (Simplified for virtual broker)
-        price = broker.get_price(pair) or 1000.0
-        amount_usd = quantity * price
+        req = await data.json()
+        pair = req.get("pair")
+        side = req.get("side") # BUY or SELL
+        quantity = float(req.get("quantity", 1.0))
         
-        if side == "BUY":
-            res = broker.buy(pair, amount_usd)
+        # 1. Direct High-Speed Execution via Roostoo API
+        from roostoo_client import RoostooClient
+        r_client = RoostooClient()
+        
+        print(f"[MANUAL] Initiating {side} for {quantity} units of {pair}...")
+        res = r_client.place_order(pair, side, quantity)
+        
+        if res.get("Success"):
+            # 2. Async update of local records
+            try:
+                broker = LocalBroker()
+                fill_price = res.get("OrderDetail", {}).get("Price", 0.0)
+                if side == "BUY":
+                    # Local record only (Roostoo already has the asset)
+                    broker.data["cash"] -= quantity * fill_price
+                    holdings = broker.data["holdings"]
+                    if pair in holdings:
+                        qty_old = holdings[pair]["qty"]
+                        avg_old = holdings[pair]["avg_price"]
+                        holdings[pair] = {"qty": qty_old + quantity, "avg_price": ((qty_old * avg_old) + (quantity * fill_price)) / (qty_old + quantity)}
+                    else:
+                        holdings[pair] = {"qty": quantity, "avg_price": fill_price}
+                else:
+                    if pair in broker.data["holdings"]:
+                        del broker.data["holdings"][pair]
+                broker._save_portfolio(broker.data)
+            except Exception as e:
+                print(f"Post-Trade local record error: {e}")
+
+            return {"status": "success", "message": f"ORDER FILLED: {side} {quantity} {pair}"}
         else:
-            res = broker.sell(pair)
+            return {"status": "error", "message": f"Roostoo Rejection: {res.get('ErrMsg')}"}
             
-        if res["success"]:
-            return {"status": "success", "message": f"Protocol Executed: {side} {pair}"}
-        else:
-            return {"status": "error", "message": res["error"]}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Execution Error: {e}")
+        return {"status": "error", "message": str(e)}
 
 
 # Premium HTML Dashboard (Upgraded with Execution UI)
@@ -366,8 +428,26 @@ HTML_CONTENT = """
 
             <div class="detail-pane">
                 <div class="thinking-module">
-                    <div class="thinking-label">Core Analyst Process</div>
-                    <div id="thinking-summary" class="thinking-text">Initializing multi-agent graph nodes...</div>
+                    <div class="thinking-label">Tactical Combat Engine</div>
+                    <div id="thinking-summary" class="thinking-text">Initializing autonomous execution loop...</div>
+                </div>
+
+                <div class="card portfolio-card">
+                    <div class="section-header" style="margin-bottom: 1rem;">
+                        <h2>Combat Portfolio</h2>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono'; font-size: 0.75rem;">
+                        <thead>
+                            <tr style="text-align: left; color: var(--text-dim); border-bottom: 1px solid var(--roostoo-amber-dim);">
+                                <th style="padding: 0.5rem 0;">ASSET</th>
+                                <th style="text-align: right;">ENTRY</th>
+                                <th style="text-align: right;">PNL%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="portfolio-body">
+                            <!-- Dynamic Holdings -->
+                        </tbody>
+                    </table>
                 </div>
 
                 <div class="card proposal-card" id="detail-panel" style="display: none;">
@@ -487,6 +567,11 @@ HTML_CONTENT = """
                 const d = await r.json();
                 document.getElementById('account-balance').innerText = `BAL: $${d.net_worth.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
                 document.getElementById('thinking-details').innerText = d.bridge;
+                
+                // Tooltip for other assets
+                let assetsStr = Object.entries(d.assets).map(([k,v]) => `${k}: ${v.toFixed(4)}`).join(' | ');
+                document.getElementById('account-balance').title = assetsStr;
+
                 if (d.is_live) {
                     document.getElementById('system-state').style.color = '#4ade80';
                     document.getElementById('system-state').innerText = 'BRIDGE ONLINE';
@@ -494,10 +579,43 @@ HTML_CONTENT = """
             } catch (e) {}
         }
 
+        async function updatePortfolio() {
+            try {
+                const r = await fetch('/api/holdings');
+                const holdings = await r.json();
+                const container = document.getElementById('portfolio-body');
+                
+                if (holdings.length === 0) {
+                    container.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 2rem; color: var(--text-dim);">NO ACTIVE POSITIONS</td></tr>`;
+                    return;
+                }
+
+                container.innerHTML = '';
+                holdings.forEach(h => {
+                    const tr = document.createElement('tr');
+                    tr.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+                    const pnlColor = h.pnl_pct >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+                    tr.innerHTML = `
+                        <td style="padding: 0.8rem 0;">
+                            <div style="font-weight: 700; color: white;">${h.symbol}</div>
+                            <div style="font-size: 0.6rem; color: var(--text-dim);">${h.qty} UNITS</div>
+                        </td>
+                        <td style="text-align: right; color: var(--text-dim);">$${h.entry.toLocaleString()}</td>
+                        <td style="text-align: right; font-weight: 700; color: ${pnlColor};">
+                            ${h.pnl_pct > 0 ? '+' : ''}${h.pnl_pct}%
+                        </td>
+                    `;
+                    container.appendChild(tr);
+                });
+            } catch (e) {}
+        }
+
         setInterval(updateDashboard, 5000);
         setInterval(updateBalance, 10000);
+        setInterval(updatePortfolio, 5000);
         updateDashboard();
         updateBalance();
+        updatePortfolio();
     </script>
 </body>
 </html>

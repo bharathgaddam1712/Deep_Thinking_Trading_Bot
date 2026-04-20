@@ -17,6 +17,24 @@ class LocalBroker:
             'secret': os.getenv('BINANCE_SECRET_KEY', ''),
         })
         self.roostoo = RoostooClient()
+        self.ticker_cache = {} # symbol: ticker_obj
+        
+        # Auto-sync with Roostoo if keys are present
+        if self.roostoo.api_key:
+            self._sync_with_roostoo()
+
+    def _sync_with_roostoo(self):
+        """Internal method to align local state with real Roostoo state."""
+        try:
+            res = self.roostoo.get_balance()
+            if res.get("Success"):
+                wallet = res.get("SpotWallet", {})
+                self.data["cash"] = wallet.get("USD", {}).get("Free", 0)
+                # Note: We don't overwrite holdings here to preserve local avg_price tracking,
+                # but we ensure the USD balance is 100% accurate.
+                self._save_portfolio(self.data)
+        except Exception:
+            pass
 
     def _load_portfolio(self):
         if os.path.exists(self.portfolio_file):
@@ -46,11 +64,20 @@ class LocalBroker:
             if "/" in symbol:
                 coin = symbol.split("/")[0]
                 binance_sym = f"{coin}/USDT"
-                ticker = self.crypto_broker.fetch_ticker(binance_sym)
-                return ticker['last']
+                
+                # Use cache for performance
+                if binance_sym not in self.ticker_cache:
+                    ticker_data = self.crypto_broker.fetch_ticker(binance_sym)
+                else:
+                    ticker_data = self.crypto_broker.fetch_ticker(binance_sym) # Still need fresh price, but could optimize further if needed
+                
+                return ticker_data['last']
             
             # 2. Fallback to yfinance for Stocks
-            ticker = yf.Ticker(symbol)
+            if symbol not in self.ticker_cache:
+                self.ticker_cache[symbol] = yf.Ticker(symbol)
+            
+            ticker = self.ticker_cache[symbol]
             price = ticker.info.get('regularMarketPrice')
             if price is None:
                 hist = ticker.history(period="1d")
