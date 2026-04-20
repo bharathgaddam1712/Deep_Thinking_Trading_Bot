@@ -14,7 +14,28 @@ There is a lot that happens under the hood, a typical flow works like this …
 4.  **The final, binding decision is made by a Portfolio Manager agent,** who weighs the Trader’s plan against the risk debate to give the final approval.
 5.  **After approval, the system extracts a clean, machine-readable signal** (BUY, SELL, or HOLD) from the manager’s natural language decision for execution via the **FastAPI Layer.**
 6.  **The Intelligence Bridge pushes the signal to a High-Frequency Rust Execution Engine** (`Trading-Bot/`) over ZeroMQ, where a final millisecond-latency risk-gate checks it before touching the actual exchange.
-7.  **Finally, the entire process creates a feedback loop.** Agents reflect on the trade’s outcome to generate new lessons, which are stored in their local sentence-transformers memory to continuously improve future performance.
+7.  **Finally, the entire process creates a feedback loop.** Agents reflect on the trade’s outcome to generate new lessons, which are stored in their local memories to continuously improve future performance.
+
+---
+
+## ⚡ RECENT UPDATE: Autonomous Execution & Dashboard
+The system has evolved from a research experiment into a **production-ready autonomous trading firm**.
+
+### 1. The Autonomous Daemon (`autonomous_trading_system.py`)
+A background process that continuously monitors the market for "Gaps" (missing analysis) and "Stale" data.
+- **Gap Filling**: Automatically identifies new assets in the universe and runs a 360-degree deep-thinking analysis.
+- **Stale Refresh**: Periodically re-evaluates existing signals to ensure the bot's "bias" is always current.
+- **Rate Limit Resilience**: Built-in global throttling to stay within free-tier API limits while maintaining high coverage.
+
+### 2. Command Center Dashboard (`api_server.py`)
+A premium, FastAPI-powered terminal for real-time monitoring and manual intervention.
+- **Live Signal Feed**: Decodes natural language agent proposals into actionable signals.
+- **Portfolio Sync**: Real-time synchronization with the Roostoo paper-trading platform.
+- **Direct Execution Protocol**: Near-zero latency manual trade execution through the Roostoo bridge.
+
+### 3. Roostoo Platform Bridge
+Direct integration with the Roostoo API for live paper trading of Cryptocurrencies. This allows the bot to prove its strategy in a live market environment with zero capital risk.
+
 
 
 The `LANGSMITH_PROJECT` variable is particularly important as it make sure all traces from this run are grouped together in the LangSmith dashboard, making it easy to isolate and analyze this specific execution.
@@ -1557,15 +1578,39 @@ pprint(audit_result.dict())
 ```
 The audit passes with `is_consistent: True`, confirming that our Market Analyst is not hallucinating and is accurately reporting on the data it retrieves from its tools. This is a crucial check for building trust in the system's outputs.
 
+## 🚀 Getting Started
+
+### 1. Environment Setup
+Create a `.env` file with your API keys:
+```env
+GEMINI_API_KEY=your_key
+TAVILY_API_KEY=your_key
+FINNHUB_API_KEY=your_key
+ROOSTOO_EMAIL=your_email
+ROOSTOO_PASSWORD=your_password
+```
+
+### 2. Run the Autonomous Daemon
+This will start the continuous market analysis loop.
+```bash
+python autonomous_trading_system.py
+```
+
+### 3. Launch the Dashboard
+Start the FastAPI server to monitor signals and portfolio.
+```bash
+python api_server.py
+```
+Visit `http://localhost:8000` to access the Command Center.
+
 ## Key Takeaways and Future Directions
-We have successfully built, executed, and evaluated a complex, standalone multi-agent financial analysis pipeline from scratch. By replicating the structure of a real-world trading firm, we’ve demonstrated how specialized agents can collaborate to transform raw, multi-source live data into a single, reasoned, and profitable trading decision.
+We have successfully built, executed, and evaluated a complex, standalone multi-agent financial analysis pipeline. By replicating the structure of a real-world trading firm, we’ve demonstrated how specialized agents can collaborate to transform raw, multi-source live data into a single, reasoned, and profitable trading decision.
 
 **Key Takeaways:**
-
-*   Assigning specific roles to different agents allows for deeper, more focused analysis at each stage.
-*   The Bull vs. Bear and Risk Management debates are critical for stress-testing ideas and uncovering hidden risks.
-*   `LangGraph` can be enough for creating a deep thinking framework for managing the complex state and conditional logic required for such a system to function automatically.
-*   A robust evaluation framework combines qualitative checks (LLM-as-a-Judge), objective outcomes (Ground Truth), and process checks (Factual Consistency, Tool Usage).
+*   **Agent Specialization**: Assigning specific roles leads to deeper, more focused analysis.
+*   **Adversarial Reasoning**: Bull vs. Bear and Risk debates are critical for uncovering hidden risks.
+*   **Autonomous Loops**: The system now maintains its own intelligence state without manual triggers.
+*   **Live Execution**: The bridge to Roostoo enables real-time validation of agentic strategies.
 
 **Future Directions:**
 

@@ -12,10 +12,19 @@ class LocalBroker:
         # CCXT for Crypto Prices (Binance)
         import ccxt
         from roostoo_client import RoostooClient
-        self.crypto_broker = ccxt.binance({
+        
+        # 1. Public Broker (unauthenticated) for high-speed price fetching
+        self.crypto_public = ccxt.binance({
+            'enableRateLimit': True,
+        })
+        
+        # 2. Private Broker (authenticated) for execution mirroring
+        self.crypto_private = ccxt.binance({
             'apiKey': os.getenv('BINANCE_API_KEY', ''),
             'secret': os.getenv('BINANCE_SECRET_KEY', ''),
+            'enableRateLimit': True,
         })
+        
         self.roostoo = RoostooClient()
         self.ticker_cache = {} # symbol: ticker_obj
         
@@ -65,20 +74,23 @@ class LocalBroker:
                 coin = symbol.split("/")[0]
                 binance_sym = f"{coin}/USDT"
                 
-                # Use cache for performance
-                if binance_sym not in self.ticker_cache:
-                    ticker_data = self.crypto_broker.fetch_ticker(binance_sym)
-                else:
-                    ticker_data = self.crypto_broker.fetch_ticker(binance_sym) # Still need fresh price, but could optimize further if needed
+                # Use public instance for price to avoid credential issues
+                try:
+                    ticker_data = self.crypto_public.fetch_ticker(binance_sym)
+                except Exception as api_err:
+                    print(f"LocalBroker: API Ticker Error for {binance_sym}: {api_err}")
+                    # Fallback to cache if possible
+                    return self.ticker_cache.get(binance_sym, {}).get('last', 0.0)
                 
+                self.ticker_cache[binance_sym] = ticker_data
                 return ticker_data['last']
             
             # 2. Fallback to yfinance for Stocks
-            if symbol not in self.ticker_cache:
+            if symbol not in self.ticker_cache or not isinstance(self.ticker_cache[symbol], yf.Ticker):
                 self.ticker_cache[symbol] = yf.Ticker(symbol)
             
             ticker = self.ticker_cache[symbol]
-            price = ticker.info.get('regularMarketPrice')
+            price = ticker.info.get('regularMarketPrice') or ticker.info.get('currentPrice')
             if price is None:
                 hist = ticker.history(period="1d")
                 if not hist.empty:
